@@ -10,6 +10,7 @@ import android.graphics.RectF;
 import android.support.annotation.Nullable;
 import android.support.v7.view.menu.MenuAdapter;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.View;
 import android.view.animation.LinearInterpolator;
 
@@ -23,18 +24,34 @@ public class WifiLoadingAnim extends View{
     private Paint mPaint;
     //WiFi图像有几条圆弧
     private int signalSize = 5;
+    private static String TAG = "TAG_WifiLoadingAnim";
 
 
     private ValueAnimator valueAnimator;
     private float mAnimatedValue = 0.9f;
-
+//    这个构造方法只有一个参数Context上下文。当我们在JAVA代码中直接通过new关键在创建这个控件时，就会调用这个方法。
     public WifiLoadingAnim(Context context) {
         this(context,null);
     }
 
+    /**
+     * 　这个构造方法有两个参数：Context上下文和AttributeSet属性集。当我们需要在自定义控件中获取属性时，就默认调用这个构造方法。AttributeSet对象就是这个控件中定义的所有属性。
+     　　我们可以通过AttributeSet对象的getAttributeCount()方法获取属性的个数，通过getAttributeName()方法获取到某条属性的名称，通过getAttributeValue()方法获取到某条属性的值。
+     　　注意：不管有没有使用自定义属性，都会默认调用这个构造方法，“使用了自定义属性就会默认调用三个参数的构造方法”的说法是错误的。
+     * @param context
+     * @param attrs
+     */
     public WifiLoadingAnim(Context context, @Nullable AttributeSet attrs) {
         this(context, attrs,0);
     }
+
+    /**
+     * 　　这个构造方法中有三个参数：Context上下文、AttributeSet属性集和defStyleAttr自定义属性的引用。这个构造方法不会默认调用，必须要手动调用，这个构造方法和两个参数的构造方法的唯一区别就是这个构造方法给我们默认传入了一个默认属性集。
+     　　defStyleAttr指向的是自定义属性的<declare-styleable>标签中定义的自定义属性集，我们在创建TypedArray对象时需要用到defStyleAttr。
+     * @param context
+     * @param attrs
+     * @param defStyleAttr
+     */
 
     public WifiLoadingAnim(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
@@ -62,14 +79,17 @@ public class WifiLoadingAnim extends View{
      Draw过程，就是在canvas上画出我们需要的View样式。同样View给我们暴露了onDraw方法
      */
 
-    @Override
+    @Override //属于测量过程
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+
+        Log.e(TAG, "getMeasuredWidth: "+getMeasuredWidth()+"  getWidth: "+getWidth()+"  getMeasuredHeight: "+getMeasuredHeight()+"  getHeight: "+getHeight());
         if (getMeasuredWidth() > getHeight()) {
             mWidth = getMeasuredHeight();
         } else {
             mWidth = getMeasuredWidth();
         }
+        Log.e(TAG, "mWidth——onMeasure: "+mWidth );
     }
 
     @Override
@@ -78,6 +98,9 @@ public class WifiLoadingAnim extends View{
         canvas.save();//锁画布(为了保存之前的画布状态)
         //平移，将画布的坐标原点向左右方向移动x，向上下方向移动y.canvas的默认位置是在（0,0）
         canvas.translate(0, mWidth / signalSize);
+
+//        canvas.translate(0, mWidth);
+        Log.e(TAG, " mWidth / signalSize: "+( mWidth / signalSize) );
         mPaint.setStrokeWidth(mWidth / signalSize / 2 / 2 / 2);
         int scale = (int) ((mAnimatedValue * signalSize - (int) (mAnimatedValue * signalSize)) * signalSize) + 1;
         RectF rect = null;
@@ -97,13 +120,21 @@ public class WifiLoadingAnim extends View{
             }
 
         }
+
+//        canvas.drawText("正在加载WIFI...",135,30,mPaint);
         //把当前画布返回（调整）到上一个save()状态之前
         canvas.restore();
     }
 
+    /**
+     * View Animation包括Tween Animation（补间动画）和Frame Animation(逐帧动画)； Property Animator包括ValueAnimator和ObjectAnimation；
+     *
+     *动画类的命名不同：View Animation中动画类取名都叫XXXXAnimation,而在Property Animator中动画类的取名则叫XXXXAnimator
+     *
+     */
     public void startAnim() {
         stopAnim();
-        startViewAnim(0f,1f,6000);
+        startViewAnim(0f,1.0f,10*1000);
 
 
 
@@ -117,7 +148,7 @@ public class WifiLoadingAnim extends View{
              */
             clearAnimation();
             valueAnimator.setRepeatCount(0);
-            valueAnimator.cancel();
+            valueAnimator.cancel();//用于取消动画
             valueAnimator.end();
             mAnimatedValue = 0.9f;
             /**
@@ -135,37 +166,47 @@ public class WifiLoadingAnim extends View{
         valueAnimator.setDuration(time);//动画执行的时间
         valueAnimator.setInterpolator(new LinearInterpolator());
         valueAnimator.setRepeatCount(ValueAnimator.INFINITE);//无限循环
-        //设置重复模式：逆向重复  设置动画重复的模式，包含REVERSE（逆向重复）和RESTART（重新开始）
+        //设置重复模式：逆向重复(倒序重新开始)  设置动画重复的模式，包含REVERSE（逆向重复）和RESTART（重新开始）
         valueAnimator.setRepeatMode(ValueAnimator.RESTART);
+        //就是监听动画的实时变化状态
         valueAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
             @Override
             public void onAnimationUpdate(ValueAnimator animation) {
+                /**
+                 * 获取ValueAnimator在运动时，当前运动点的值
+                 *  valueAnimator.getAnimatedValue() 是Object 类型
+                 */
                 mAnimatedValue = (float) valueAnimator.getAnimatedValue();
                 invalidate();
             }
         });
 
-//        valueAnimator.addListener(new Animator.AnimatorListener() {
-//            @Override
-//            public void onAnimationStart(Animator animation) {
-//
-//            }
-//
-//            @Override
-//            public void onAnimationEnd(Animator animation) {
-//
-//            }
-//
-//            @Override
-//            public void onAnimationCancel(Animator animation) {
-//
-//            }
-//
-//            @Override
-//            public void onAnimationRepeat(Animator animation) {
-//
-//            }
-//        });
+        //主要是监听Animation的四个状态，
+        valueAnimator.addListener(new Animator.AnimatorListener() {
+            //当动画开始时
+            @Override
+            public void onAnimationStart(Animator animation) {
+
+            }
+
+            //当动画结束时调用
+            @Override
+            public void onAnimationEnd(Animator animation) {
+
+            }
+
+            //当动画取消时
+            @Override
+            public void onAnimationCancel(Animator animation) {
+
+            }
+
+            //当动画重复时
+            @Override
+            public void onAnimationRepeat(Animator animation) {
+
+            }
+        });
         if (!valueAnimator.isRunning()) {
             valueAnimator.start();
         }
